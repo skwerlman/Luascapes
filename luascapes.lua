@@ -1,11 +1,11 @@
 -- should be used with something that supports ANSI (unlike print/io.write)
 -- i use os.execute('echo ...')
 
-local ANSI = {}
+local luascapes = {}
 
 local esc = '033' -- '033' or 'e', for sh or bash, respectively (lua seems to like sh over bash)
 
-ANSI.codes = {
+luascapes.codes = {
   --formatting
   ['reset']='0',
   ['bold']='1',
@@ -73,21 +73,21 @@ ANSI.codes = {
 }
 
 -- used for color/formatting codes
-function ANSI.code(...) -- assembles multiple color/formatting codes into a single sequence
+function luascapes.code(...) -- assembles multiple color/formatting codes into a single sequence
   local sequence = '\\'..esc..'['
   for i,v in ipairs({...}) do
     assert(type(v)=='string', 'Bad argument #'..tostring(i)..': expected string, got '..type(v))
-    assert(ANSI.codes[v], 'Invalid or unsupported ANSI escape code ('..v..')')
-    sequence = sequence..(i == 1 and '' or ';')..ANSI.codes[v]
+    assert(luascapes.codes[v], 'Invalid or unsupported ANSI escape code ('..v..')')
+    sequence = sequence..(i == 1 and '' or ';')..luascapes.codes[v]
   end
   return sequence..'m'
 end
 
 -- used for other codes
-function ANSI.term(code, ...) -- can only return one codeper sequence
+function luascapes.term(code, ...) -- can only return one code per sequence
   assert(type(code)=='string', 'Bad argument #1: expected string, got '..type(code))
-  assert(ANSI.codes.term[code], 'Invalid or unsupported ANSI escape code ('..code..')')
-  local sequence = '\\'..esc..'['..ANSI.codes.term[code]
+  assert(luascapes.codes.term[code], 'Invalid or unsupported ANSI escape code ('..code..')')
+  local sequence = '\\'..esc..'['..luascapes.codes.term[code]
   for i,v in ipairs({...}) do
     assert(type(v)=='string', 'Bad argument #'..tostring(i+1)..': expected string, got '..type(v))
     sequence = sequence:gsub('<N>', v, 1)
@@ -96,17 +96,17 @@ function ANSI.term(code, ...) -- can only return one codeper sequence
 end
 
 --[[ testing code; makes sure parsers work right
-for code, def in pairs(ANSI.codes) do
+for code, def in pairs(luascapes.codes) do
   if code~='term' then
-    local o=ANSI.code(code)
+    local o=luascapes.code(code)
     print(o)
   else
     for scode, def in pairs(def) do
-      local o=ANSI.term(scode, '1', '1')
+      local o=luascapes.term(scode, '1', '1')
       print(o)
     end
   end
 end
 --]]
 
-return ANSI
+return luascapes

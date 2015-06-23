@@ -1,3 +1,23 @@
+#!/usr/bin/env lua
+--[[
+  luascapes.lua
+  V0.0.2
+
+  tiny, pure-lua ANSI escape code lib
+
+  (c) 2014-2015 David Birnhak
+  Released under the MIT License
+
+  c/l:
+  v0.0.2:
+    added luascapes.lscape
+      using basic functions made for ugly code
+    removed all asserts in favor of returning nil,err
+  v0.0.1:
+    initial release
+
+]]
+
 -- should be used with something that supports ANSI (unlike print/io.write)
 -- i use os.execute('echo ...')
 
@@ -62,7 +82,7 @@ luascapes.codes = {
     ['cforward']='<N>C',
     ['cbackward']='<N>D',
     ['setpos']='<N>;<N>H',
-    ['setpos2']='<N>;<N>f',
+    ['setpos2']='<N>;<N>f', -- not as widely supported
     ['clear']='2J',
     ['erase']='K',
     -- save, restore cursor pos
@@ -76,8 +96,12 @@ luascapes.codes = {
 function luascapes.code(...) -- assembles multiple color/formatting codes into a single sequence
   local sequence = '\\'..esc..'['
   for i,v in ipairs({...}) do
-    assert(type(v)=='string', 'Bad argument #'..tostring(i)..': expected string, got '..type(v))
-    assert(luascapes.codes[v], 'Invalid or unsupported ANSI escape code ('..v..')')
+    if type(v)~='string' then
+      return nil, 'Bad argument #'..tostring(i)..': expected string, got '..type(v)
+    end
+    if not luascapes.codes[v] then
+      return '', 'Invalid or unsupported ANSI escape code ('..v..')'
+    end
     sequence = sequence..(i == 1 and '' or ';')..luascapes.codes[v]
   end
   return sequence..'m'
@@ -85,26 +109,52 @@ end
 
 -- used for other codes
 function luascapes.term(code, ...) -- can only return one code per sequence
-  assert(type(code)=='string', 'Bad argument #1: expected string, got '..type(code))
-  assert(luascapes.codes.term[code], 'Invalid or unsupported ANSI escape code ('..code..')')
+  if type(code)~='string' then
+    return nil, 'Bad argument #1: expected string, got '..type(code)
+  end
+  if not luascapes.codes.term[code] then 
+    return '', 'Invalid or unsupported ANSI escape code ('..code..')'
+  end
   local sequence = '\\'..esc..'['..luascapes.codes.term[code]
   for i,v in ipairs({...}) do
-    assert(type(v)=='string', 'Bad argument #'..tostring(i+1)..': expected string, got '..type(v))
+    if type(v)~='string' then
+      return nil, 'Bad argument #'..tostring(i+1)..': expected string, got '..type(v)
+    end
     sequence = sequence:gsub('<N>', v, 1)
   end
   return sequence
+end
+
+-- given a string and codes, returns a formatted string terminated by a reset code
+function luascapes.lscape(string, ...) -- returns '' instead of nil on errors b/c error-checking mid-string is dumb
+  if type(string)~='string' then
+    return nil, 'Bad argument #1: expected string, got '..type(string)
+  end
+  local fcode, err1 = luascapes.code(...)
+  if err1 then return fcode, err1 end
+  local rcode, err2 = luascapes.code('reset')
+  if err2 then return rcode, err2 end
+  return fcode..string..rcode
 end
 
 --[[ testing code; makes sure parsers work right
 for code, def in pairs(luascapes.codes) do
   if code~='term' then
     local o=luascapes.code(code)
+    os.execute('/usr/bin/env echo -en "'..o..'"')
     print(o)
+    os.execute('/usr/bin/env echo -en "'..luascapes.code('reset')..luascapes.term('erase')..'"')
+    local p=luascapes.lscape(code, code)
+    os.execute('/usr/bin/env echo -e "'..p..luascapes.term('erase')..'"')
   else
     for scode, def in pairs(def) do
       local o=luascapes.term(scode, '1', '1')
+      os.execute('/usr/bin/env echo -en "'..o..'"')
       print(o)
+      os.execute('/usr/bin/env echo -e "'..luascapes.code('reset')..luascapes.term('erase')..'"')
     end
+  end
+  for _=1,100000000 do
   end
 end
 --]]
